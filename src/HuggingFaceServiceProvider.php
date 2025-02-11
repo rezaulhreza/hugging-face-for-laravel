@@ -11,8 +11,7 @@ class HuggingFaceServiceProvider extends PackageServiceProvider
     {
         $package
             ->name('hugging-face')
-            ->hasConfigFile()
-            ->hasViews();
+            ->hasConfigFile();
     }
 
     public function packageRegistered()
