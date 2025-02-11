@@ -197,7 +197,8 @@ class HuggingFaceService
                 'raw_response' => $response->json(),
             ];
         } catch (\Throwable) {
-            logger()->error("processTextResponse failed");
+            logger()->error('processTextResponse failed');
+
             return null;
         }
     }
