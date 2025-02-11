@@ -5,7 +5,7 @@ namespace Rezaulhreza\HuggingFace\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @see \Rezaulhreza\HuggingFace\HuggingFace
+ * @see \Rezaulhreza\HuggingFace\HuggingFaceService
  */
 class HuggingFace extends Facade
 {
