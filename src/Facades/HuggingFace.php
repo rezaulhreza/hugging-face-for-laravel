@@ -3,7 +3,6 @@
 namespace Rezaulhreza\HuggingFace\Facades;
 
 use Illuminate\Support\Facades\Facade;
-use Rezaulhreza\HuggingFace\HuggingFaceService;
 
 /**
  * @see \Rezaulhreza\HuggingFace\HuggingFace

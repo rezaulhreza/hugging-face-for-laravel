@@ -15,7 +15,7 @@ class HuggingFaceServiceTest extends TestCase
         $this->huggingFaceService = new HuggingFaceService('fake-api-token');
     }
 
-    public function testGetResponseWithSupportedModel()
+    public function test_get_response_with_supported_model()
     {
         // Mocking the response from the API
         Http::fake([
@@ -32,7 +32,7 @@ class HuggingFaceServiceTest extends TestCase
                     'model' => 'meta-llama/Meta-Llama-3-8B-Instruct',
                     'messages' => [['role' => 'user', 'content' => 'Hello!']],
                     'max_tokens' => 500,
-                    'stream' => false
+                    'stream' => false,
                 ];
         });
 
@@ -41,7 +41,7 @@ class HuggingFaceServiceTest extends TestCase
         $this->assertEquals('Hello!', $response['text']);
     }
 
-    public function testGetResponseWithPreviousMessages()
+    public function test_get_response_with_previous_messages()
     {
         // Mocking the response from the API
         Http::fake([
@@ -52,7 +52,7 @@ class HuggingFaceServiceTest extends TestCase
         // Previous messages to be sent
         $previousMessages = [
             ['role' => 'user', 'content' => 'What is your name?'],
-            ['role' => 'assistant', 'content' => 'I am an AI.']
+            ['role' => 'assistant', 'content' => 'I am an AI.'],
         ];
 
         // Test with a valid model and previous messages
@@ -66,7 +66,7 @@ class HuggingFaceServiceTest extends TestCase
                     'model' => 'meta-llama/Meta-Llama-3-8B-Instruct',
                     'messages' => array_merge($previousMessages, [['role' => 'user', 'content' => 'Hello!']]),
                     'max_tokens' => 500,
-                    'stream' => false
+                    'stream' => false,
                 ];
         });
 
@@ -75,13 +75,13 @@ class HuggingFaceServiceTest extends TestCase
         $this->assertEquals('Hi there!', $response['text']);
     }
 
-    public function testGetResponseWithUnsupportedModel()
+    public function test_get_response_with_unsupported_model()
     {
         $response = $this->huggingFaceService->getResponse('Hello!', 'unsupported/model');
         $this->assertNull($response);
     }
 
-    public function testGetResponseWithFailedHttpRequest()
+    public function test_get_response_with_failed_http_request()
     {
         // Mocking a failed response
         Http::fake([
@@ -92,13 +92,13 @@ class HuggingFaceServiceTest extends TestCase
         $this->assertNull($response);
     }
 
-    public function testIsModelSupported()
+    public function test_is_model_supported()
     {
         $this->assertTrue($this->huggingFaceService->isModelSupported('CompVis/stable-diffusion-v1-4'));
         $this->assertFalse($this->huggingFaceService->isModelSupported('unsupported/model'));
     }
 
-    public function testGetResponseWithMalformedPayload()
+    public function test_get_response_with_malformed_payload()
     {
         // Mock the API to return an error response for malformed requests
         Http::fake([

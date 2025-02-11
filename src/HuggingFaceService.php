@@ -27,10 +27,8 @@ class HuggingFaceService
     /**
      * Get response from HuggingFace model based on the input prompt
      *
-     * @param string $prompt
-     * @param string $model
-     * @param array $options Additional options for the model
-     * @return array|string|null
+     * @param  array  $options  Additional options for the model
+     *
      * @throws InvalidArgumentException
      */
     public function getResponse(string $prompt, string $model, array $options = []): array|string|null
@@ -49,7 +47,7 @@ class HuggingFaceService
                     'Authorization' => "Bearer {$this->apiToken}",
                     'Content-Type' => 'application/json',
                 ])
-                ->post($this->baseUrl . $url, $payload);
+                ->post($this->baseUrl.$url, $payload);
 
             if ($response->failed()) {
                 $this->handleError($response);
@@ -67,7 +65,7 @@ class HuggingFaceService
 
     protected function validateModel(string $model): void
     {
-        if (!$this->isModelSupported($model)) {
+        if (! $this->isModelSupported($model)) {
             throw new InvalidArgumentException("Unsupported model: {$model}");
         }
     }
@@ -96,9 +94,6 @@ class HuggingFaceService
 
     /**
      * Handle API errors
-     *
-     * @param Response $response
-     * @return void
      */
     protected function handleError(Response $response): void
     {
@@ -114,20 +109,15 @@ class HuggingFaceService
         logger()->error('HuggingFace API Error', $errorData);
 
         match ($statusCode) {
-            401 => throw new \RuntimeException('Invalid or expired API token: ' . $errorData['error'], 401),
-            429 => throw new \RuntimeException('Rate limit exceeded: ' . $errorData['error'], 429),
-            500 => throw new \RuntimeException('HuggingFace service is unavailable: ' . $errorData['error'], 500),
-            default => throw new \RuntimeException("API request failed with status {$statusCode}: " . $errorData['error'], $statusCode)
+            401 => throw new \RuntimeException('Invalid or expired API token: '.$errorData['error'], 401),
+            429 => throw new \RuntimeException('Rate limit exceeded: '.$errorData['error'], 429),
+            500 => throw new \RuntimeException('HuggingFace service is unavailable: '.$errorData['error'], 500),
+            default => throw new \RuntimeException("API request failed with status {$statusCode}: ".$errorData['error'], $statusCode)
         };
     }
 
     /**
      * Prepare payload based on the model type
-     *
-     * @param string $model
-     * @param string $prompt
-     * @param array $options
-     * @return array
      */
     protected function preparePayload(string $model, string $prompt, array $options): array
     {
@@ -173,21 +163,14 @@ class HuggingFaceService
 
     /**
      * Check if all messages have the required structure
-     *
-     * @param array $messages
-     * @return bool
      */
     protected function areMetaLlamaPreviousMessagesValid(array $messages): bool
     {
-        return array_reduce($messages, fn($carry, $message) => $carry && isset($message['role'], $message['content']), true);
+        return array_reduce($messages, fn ($carry, $message) => $carry && isset($message['role'], $message['content']), true);
     }
 
     /**
      * Process the response based on the model type
-     *
-     * @param Response $response
-     * @param string $modelType
-     * @return array|string|null
      */
     protected function processResponse(Response $response, string $modelType): array|string|null
     {
@@ -200,13 +183,10 @@ class HuggingFaceService
 
     /**
      * Process image generation response
-     *
-     * @param Response $response
-     * @return string|null
      */
     protected function processImageResponse(Response $response): ?string
     {
-        return $response->body() ? 'data:image/png;base64,' . base64_encode($response->body()) : null;
+        return $response->body() ? 'data:image/png;base64,'.base64_encode($response->body()) : null;
     }
 
     protected function processTextResponse(Response $response): ?array
@@ -214,18 +194,15 @@ class HuggingFaceService
         try {
             return [
                 'text' => $this->extractTextFromResponse($response->json()),
-                'raw_response' => $response->json()
+                'raw_response' => $response->json(),
             ];
         } catch (\Throwable) {
-            null;
-        };
+
+        }
     }
 
     /**
      * Extract the text content from the response based on the model structure.
-     *
-     * @param array $data
-     * @return string|null
      */
     protected function extractTextFromResponse(array $data): ?string
     {
@@ -242,9 +219,6 @@ class HuggingFaceService
 
     /**
      * Extract text for Meta Llama response format.
-     *
-     * @param array $data
-     * @return string|null
      */
     protected function extractMetaLlamaResponse(array $data): ?string
     {
@@ -253,9 +227,6 @@ class HuggingFaceService
 
     /**
      * Extract text for standard text response format.
-     *
-     * @param array $data
-     * @return string|null
      */
     protected function extractStandardTextResponse(array $data): ?string
     {
@@ -264,9 +235,6 @@ class HuggingFaceService
 
     /**
      * Check if a model is supported
-     *
-     * @param string $model
-     * @return bool
      */
     public function isModelSupported(string $model): bool
     {
