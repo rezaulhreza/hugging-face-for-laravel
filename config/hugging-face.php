@@ -18,8 +18,9 @@ return [
     | Default Models
     |--------------------------------------------------------------------------
     |
-    | These are the default models that are supported out of the box.
-    | You can add your own models here.
+    | These are some pre-configured models for convenience. You can still use
+    | any other HuggingFace model by specifying its configuration directly
+    | when calling the service. Note: if it's not supported by this package you can extend the service and add your own models.
     |
     */
     'models' => [
@@ -31,5 +32,29 @@ return [
             'type' => 'text',
             'url' => 'meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions',
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Model Type Mappings
+    |--------------------------------------------------------------------------
+    |
+    | Define the default type mappings for different model tasks. This helps
+    | determine how to process responses from different types of models.
+    |
+    */
+    'model_types' => [
+        'text-generation' => 'text',
+        'text2text-generation' => 'text',
+        'question-answering' => 'text',
+        'summarization' => 'text',
+        'translation' => 'text',
+        'text-classification' => 'text',
+        'image-classification' => 'text',
+        'image-segmentation' => 'text',
+        'image-to-text' => 'text',
+        'text-to-image' => 'image',
+        'image-to-image' => 'image',
+        'visual-question-answering' => 'text',
     ],
 ];
