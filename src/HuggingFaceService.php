@@ -232,7 +232,7 @@ class HuggingFaceService
      */
     protected function extractStandardTextResponse(array $data): ?string
     {
-        return Arr::get($data, '0.generated_text') ?? (is_string($data) ? $data : null);
+        return Arr::get($data, '0.generated_text');
     }
 
     /**
