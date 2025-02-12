@@ -3,13 +3,14 @@
 namespace Rezaulhreza\HuggingFace;
 
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
 
 class HuggingFaceService
 {
     protected array $models;
+
+    protected array $modelTypes;
 
     public function __construct(
         protected readonly string $apiToken,
@@ -19,35 +20,33 @@ class HuggingFaceService
             throw new InvalidArgumentException('HuggingFace API token cannot be empty');
         }
 
-        $this->models = config()->get('hugging-face.models') ?? throw new InvalidArgumentException(
-            'HuggingFace models configuration is missing'
-        );
+        $this->models = config('hugging-face.models', []);
+        $this->modelTypes = config('hugging-face.model_types', []);
     }
 
     /**
-     * Get response from HuggingFace model based on the input prompt
+     * Get response from any HuggingFace model
      *
-     * @param  array  $options  Additional options for the model
-     *
-     * @throws InvalidArgumentException
+     * @param  string  $prompt  The input prompt or data
+     * @param  string  $model  The model identifier
+     * @param  array  $options  Additional options for the request
+     * @return array|string|null Response data, base64 image string for images, or null on failure
      */
     public function getResponse(string $prompt, string $model, array $options = []): array|string|null
     {
         try {
-            $this->validateModel($model);
-            $this->validatePrompt($prompt);
+            $modelConfig = $this->resolveModelConfig($model, $options);
 
-            $modelConfig = $this->models[$model];
-            $url = $modelConfig['url'] ?? throw new InvalidArgumentException("Invalid model configuration for: {$model}");
-            $payload = $this->preparePayload($model, $prompt, $options);
+            if (empty($prompt)) {
+                throw new InvalidArgumentException('Prompt cannot be empty');
+            }
 
-            $response = Http::timeout(30)
+            $payload = $this->buildPayload($prompt, $options);
+
+            $response = Http::withToken($this->apiToken)
+                ->timeout(30)
                 ->retry(2, 1000)
-                ->withHeaders([
-                    'Authorization' => "Bearer {$this->apiToken}",
-                    'Content-Type' => 'application/json',
-                ])
-                ->post($this->baseUrl.$url, $payload);
+                ->post($this->baseUrl . $model, $payload);
 
             if ($response->failed()) {
                 $this->handleError($response);
@@ -60,24 +59,6 @@ class HuggingFaceService
             $this->logException($e);
 
             return null;
-        }
-    }
-
-    protected function validateModel(string $model): void
-    {
-        if (! $this->isModelSupported($model)) {
-            throw new InvalidArgumentException("Unsupported model: {$model}");
-        }
-    }
-
-    protected function validatePrompt(string $prompt): void
-    {
-        if (empty(trim($prompt))) {
-            // throw new InvalidArgumentException('Prompt cannot be empty');
-            logger()->error('HuggingFace Service Error', [
-                'exception' => InvalidArgumentException::class,
-                'message' => 'Prompt cannot be empty',
-            ]);
         }
     }
 
@@ -109,130 +90,132 @@ class HuggingFaceService
         logger()->error('HuggingFace API Error', $errorData);
 
         match ($statusCode) {
-            401 => throw new \RuntimeException('Invalid or expired API token: '.$errorData['error'], 401),
-            429 => throw new \RuntimeException('Rate limit exceeded: '.$errorData['error'], 429),
-            500 => throw new \RuntimeException('HuggingFace service is unavailable: '.$errorData['error'], 500),
-            default => throw new \RuntimeException("API request failed with status {$statusCode}: ".$errorData['error'], $statusCode)
+            401 => throw new \RuntimeException('Invalid or expired API token: ' . $errorData['error'], 401),
+            429 => throw new \RuntimeException('Rate limit exceeded: ' . $errorData['error'], 429),
+            500 => throw new \RuntimeException('HuggingFace service is unavailable: ' . $errorData['error'], 500),
+            default => throw new \RuntimeException("API request failed with status {$statusCode}: " . $errorData['error'], $statusCode)
         };
     }
 
     /**
-     * Prepare payload based on the model type
+     * Build the request payload based on the prompt and options
      */
-    protected function preparePayload(string $model, string $prompt, array $options): array
+    protected function buildPayload(string $prompt, array $options): array
     {
-        if ($model === 'meta-llama/Meta-Llama-3-8B-Instruct') {
-            return $this->buildLlamaPayload($prompt, $options);
+        $payload = ['inputs' => $prompt];
+
+        // Add any additional parameters from options
+        if (isset($options['parameters'])) {
+            $payload = array_merge($payload, $options['parameters']);
         }
 
-        return $this->buildDefaultPayload($prompt, $options);
-    }
-
-    protected function buildLlamaPayload(string $prompt, array $options): array
-    {
-        $messages = $this->getMessages($prompt, $options['previous_message'] ?? []);
-
-        return [
-            'model' => 'meta-llama/Meta-Llama-3-8B-Instruct',
-            'messages' => $messages,
-            'max_tokens' => $options['max_tokens'] ?? 500,
-            'stream' => $options['stream'] ?? false,
-        ];
-    }
-
-    protected function buildDefaultPayload(string $prompt, array $options): array
-    {
-        return [
-            'inputs' => $prompt,
-            'options' => $options,
-        ];
-    }
-
-    protected function getMessages(string $prompt, array $previousMessages): array
-    {
-        // Start with the current user prompt
-        $messages = [['role' => 'user', 'content' => $prompt]];
-
-        // Merge previous messages if they exist and are valid
-        if ($this->areMetaLlamaPreviousMessagesValid($previousMessages)) {
-            $messages = array_merge($previousMessages, $messages);
-        }
-
-        return $messages;
-    }
-
-    /**
-     * Check if all messages have the required structure
-     */
-    protected function areMetaLlamaPreviousMessagesValid(array $messages): bool
-    {
-        return array_reduce($messages, fn ($carry, $message) => $carry && isset($message['role'], $message['content']), true);
+        return $payload;
     }
 
     /**
      * Process the response based on the model type
      */
-    protected function processResponse(Response $response, string $modelType): array|string|null
-    {
-        return match ($modelType) {
-            'image' => $this->processImageResponse($response),
-            'text' => $this->processTextResponse($response),
-            default => null,
-        };
-    }
-
-    /**
-     * Process image generation response
-     */
-    protected function processImageResponse(Response $response): ?string
-    {
-        return $response->body() ? 'data:image/png;base64,'.base64_encode($response->body()) : null;
-    }
-
-    protected function processTextResponse(Response $response): ?array
+    protected function processResponse(Response $response, string $type): array|string|null
     {
         try {
-            return [
-                'text' => $this->extractTextFromResponse($response->json()),
-                'raw_response' => $response->json(),
-            ];
-        } catch (\Throwable) {
-            logger()->error('processTextResponse failed');
+            if ($type === 'image') {
+                return 'data:image/png;base64,' . base64_encode($response->body());
+            }
 
+            $data = $response->json();
+
+            if (!$data) {
+                return [
+                    'text' => $response->body(),
+                    'raw' => $data,
+                ];
+            }
+
+            // Handle chat completion format
+            if (isset($data['choices'][0]['message']['content'])) {
+                return [
+                    'text' => $data['choices'][0]['message']['content'],
+                    'raw' => $data,
+                ];
+            }
+
+            // Handle array response format
+            if (isset($data[0])) {
+                $firstResult = $data[0];
+
+                return [
+                    'text' => $firstResult['generated_text']
+                        ?? $firstResult['answer']
+                        ?? $firstResult['translation_text']
+                        ?? $firstResult['summary_text']
+                        ?? json_encode($firstResult),
+                    'raw' => $data,
+                ];
+            }
+
+            // Handle object response format
+            return [
+                'text' => $data['generated_text']
+                    ?? $data['answer']
+                    ?? $data['translation_text']
+                    ?? $data['summary_text']
+                    ?? json_encode($data),
+                'raw' => $data,
+            ];
+        } catch (\Throwable $e) {
             return null;
         }
     }
 
     /**
-     * Extract the text content from the response based on the model structure.
+     * Resolve the model configuration
      */
-    protected function extractTextFromResponse(array $data): ?string
+    protected function resolveModelConfig(string $model, array $options): array
     {
-        if ($text = $this->extractMetaLlamaResponse($data)) {
-            return $text;
+        // Check if it's a pre-configured model
+        if (isset($this->models[$model])) {
+            return $this->models[$model];
         }
 
-        if ($text = $this->extractStandardTextResponse($data)) {
-            return $text;
+        // If type is provided in options, use it
+        if (isset($options['type'])) {
+            return [
+                'type' => $options['type'],
+                'url' => $model,
+            ];
         }
 
-        return json_encode($data);
+        try {
+            // Try to fetch model info from HuggingFace
+            $modelInfo = Http::withToken($this->apiToken)
+                ->get("https://huggingface.co/api/models/{$model}")
+                ->json();
+
+            $taskType = $modelInfo['pipeline_tag'] ?? null;
+
+            return [
+                'type' => $this->determineModelType($taskType),
+                'url' => $model,
+            ];
+        } catch (\Throwable $e) {
+            // Default to text type if we can't determine the type
+            return [
+                'type' => 'text',
+                'url' => $model,
+            ];
+        }
     }
 
     /**
-     * Extract text for Meta Llama response format.
+     * Determine the model type based on the task
      */
-    protected function extractMetaLlamaResponse(array $data): ?string
+    protected function determineModelType(?string $taskType): string
     {
-        return Arr::get($data, 'choices.0.message.content');
-    }
+        if ($taskType && isset($this->modelTypes[$taskType])) {
+            return $this->modelTypes[$taskType];
+        }
 
-    /**
-     * Extract text for standard text response format.
-     */
-    protected function extractStandardTextResponse(array $data): ?string
-    {
-        return Arr::get($data, '0.generated_text');
+        return 'text';
     }
 
     /**
