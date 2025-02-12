@@ -46,7 +46,7 @@ class HuggingFaceService
             $response = Http::withToken($this->apiToken)
                 ->timeout(30)
                 ->retry(2, 1000)
-                ->post($this->baseUrl . $model, $payload);
+                ->post($this->baseUrl.$model, $payload);
 
             if ($response->failed()) {
                 $this->handleError($response);
@@ -90,10 +90,10 @@ class HuggingFaceService
         logger()->error('HuggingFace API Error', $errorData);
 
         match ($statusCode) {
-            401 => throw new \RuntimeException('Invalid or expired API token: ' . $errorData['error'], 401),
-            429 => throw new \RuntimeException('Rate limit exceeded: ' . $errorData['error'], 429),
-            500 => throw new \RuntimeException('HuggingFace service is unavailable: ' . $errorData['error'], 500),
-            default => throw new \RuntimeException("API request failed with status {$statusCode}: " . $errorData['error'], $statusCode)
+            401 => throw new \RuntimeException('Invalid or expired API token: '.$errorData['error'], 401),
+            429 => throw new \RuntimeException('Rate limit exceeded: '.$errorData['error'], 429),
+            500 => throw new \RuntimeException('HuggingFace service is unavailable: '.$errorData['error'], 500),
+            default => throw new \RuntimeException("API request failed with status {$statusCode}: ".$errorData['error'], $statusCode)
         };
     }
 
@@ -119,12 +119,12 @@ class HuggingFaceService
     {
         try {
             if ($type === 'image') {
-                return 'data:image/png;base64,' . base64_encode($response->body());
+                return 'data:image/png;base64,'.base64_encode($response->body());
             }
 
             $data = $response->json();
 
-            if (!$data) {
+            if (! $data) {
                 return [
                     'text' => $response->body(),
                     'raw' => $data,
